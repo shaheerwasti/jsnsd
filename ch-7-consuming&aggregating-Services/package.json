@@ -1,0 +1,16 @@
+{
+  "name": "ch-7-consuming-aggregating-services",
+  "version": "1.0.0",
+  "description": "LFL",
+  "main": "consuming-services.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node consuming-service"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "undici": "^5.25.2"
+  }
+}

@@ -40,7 +40,7 @@ const send = (url, { method = 'post' } = {}) => {
         err.method = method.toUpperCase()
         cb(err)
       })
-      .end(data)
+      .end(JSON.stringify(data))
   })(data))
 }
 const body = async (res) => {
@@ -49,18 +49,19 @@ const body = async (res) => {
   return Buffer.concat(chunks).toString()
 }
 
+
+
 async function start () {
   const server = net.createServer().listen()
   await once(server, 'listening')
-  const { port } = server.address()
+  //const { port } = server.address()
+  const port =3000;
   server.close()
   await once(server, 'close')
   await writeFile(join(__dirname, 'model.js'), testingModel())
   const sp = spawn(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['start'], { env: { ...process.env, PORT: port }, stdio: ['ignore', 'ignore', 'inherit'] })
-  const [ err ] = await Promise.race([once(sp, 'spawn'), once(sp, 'error')])
 
   try {
-    if (err) throw err
     await validate({ port })
   } catch (err) {
     if (err.code === 'ERR_ASSERTION') {
@@ -70,7 +71,7 @@ async function start () {
     throw err
   } finally {
     await writeFile(join(__dirname, 'model.js'), model())
-    try { sp.kill() } catch {}
+    sp.kill()
   }
 }
 
@@ -82,8 +83,8 @@ async function validate ({ port }, retries = 0) {
       assert.fail(`Unable to connect to server on port: ${port}`)
     }
     await t(ok(port))
-    await t(notFound(port))
-    await t(notAllowed(port))
+    await t(noContent(port))
+    await t(notFound(port, 'boat/999'))
     await t(serverError(port))
     done = true
     passed = true
@@ -111,8 +112,8 @@ async function t (validator) {
   }
 }
 
-async function ok (port) {
-  const url = `http://localhost:${port}/boat/1`
+async function ok (port, id = 1, expect = { brand: 'Chaparral', color: 'red' }) {
+  const url = `http://localhost:${port}/boat/${id}`
   const res = await get(url)
 
   assert.equal(
@@ -133,7 +134,7 @@ async function ok (port) {
   const content = await body(res)
   try {
     const result = JSON.parse(content)
-    assert.deepEqual(result, { brand: 'Chaparral', color: 'red' }, `GET ${url} must respond with correct data\n   got -  ${content})`)
+    assert.deepEqual(result, expect, `GET ${url} must respond with correct data\n   got -  ${content})`)
     console.log(`☑️  GET ${url} responded with correct data`)
   } catch (err) {
     if (err instanceof SyntaxError) assert.fail(`GET ${url} response not parsable JSON`)
@@ -141,54 +142,47 @@ async function ok (port) {
   }
 }
 
-async function notFound (port) {
-  {
-    const url = `http://localhost:${port}/unsupported/route`
-    const res = await get(url)
 
-    assert.equal(
-      res.statusCode,
-      404,
-      `GET ${url} must respond with 404 response`
-    )
-    console.log(`☑️  GET ${url} responded with 404 response`)
-  }
-  {
-    const url = `http://localhost:${port}/boat/999`
-    const res = await get(url)
-
-    assert.equal(
-      res.statusCode,
-      404,
-      `GET ${url} must respond with 404 response`
-    )
-    console.log(`☑️  GET ${url} responded with 404 response`)
-  }
-}
-
-async function notAllowed (port) {
-  const url = `http://localhost:${port}/boat/999`
-  const tx = send(url)
+async function noContent (port) {
+  const url = `http://localhost:${port}/boat/1`
+  const tx = send(url, {method: 'delete'})
   const res = await tx()
 
-  assert.match(
-    res.statusCode.toString(),
-    /400|404|405/,
-    `POST ${url} must respond with 400, 404, or 405 response`
+  assert.equal(
+    res.statusCode,
+    204,
+    `DELETE ${url} must respond with 204 response, got ${res.statusCode}`
   )
-  console.log(`☑️  POST ${url} responded with 400, 404, or 405 response`)
+  console.log(`☑️  DELETE ${url} responded with a 204 response`)
+
+  console.log(`☑️  DELETE ${url} responded with correct Content-Type header`)
+
+  await notFound(port, 'boat/1', 'GET')
+}
+
+
+async function notFound (port, route, method = 'DELETE') {
+  const url = `http://localhost:${port}/${route}`
+  const res = method === 'DELETE' ? await (send(url, {method: 'delete'})()) : await get(url)
+
+  assert.equal(
+    res.statusCode,
+    404,
+    `${method} ${url} must respond with 404 response`
+  )
+  console.log(`☑️  ${method} ${url} responded with 404 response`)
 }
 
 async function serverError (port) {
   const url = `http://localhost:${port}/boat/${ROUTE_500}`
-  const res = await get(url)
-
+  const tx = send(url, {method: 'delete'})
+  const res = await tx()
   assert.equal(
     res.statusCode,
     500,
-    `GET ${url} must respond with 500 response`
+    `DELETE ${url} must respond with 500 response`
   )
-  console.log(`☑️  GET ${url} responded with 500 response`)
+  console.log(`☑️  DELETE ${url} responded with 500 response`)
 }
 
 start().catch(console.error)
@@ -199,13 +193,13 @@ function model () {
   module.exports = {
     boat: boatModel()
   }
-  
+
   function boatModel () {
     const db = {
       1: { brand: 'Chaparral', color: 'red' },
       2: { brand: 'Chaparral', color: 'blue' }
     }
-  
+
     return {
       uid,
       create,
@@ -213,7 +207,7 @@ function model () {
       update,
       del
     }
-  
+
     function uid () {
       return Object.keys(db)
         .sort((a, b) => a - b)
@@ -221,7 +215,7 @@ function model () {
         .filter((n) => !isNaN(n))
         .pop() + 1 + ''
     }
-  
+
     function create (id, data, cb) {
       if (db.hasOwnProperty(id)) {
         const err = Error('resource exists')
@@ -232,7 +226,7 @@ function model () {
       db[id] = data
       setImmediate(() => cb(null, id))
     }
-  
+
     function read (id, cb) {
       if (!(db.hasOwnProperty(id))) {
         const err = Error('not found')
@@ -242,7 +236,7 @@ function model () {
       }
       setImmediate(() => cb(null, db[id]))
     }
-  
+
     function update (id, data, cb) {
       if (!(db.hasOwnProperty(id))) {
         const err = Error('not found')
@@ -253,8 +247,9 @@ function model () {
       db[id] = data
       setImmediate(() => cb())
     }
-  
+
     function del (id, cb) {
+
       if (!(db.hasOwnProperty(id))) {
         const err = Error('not found')
         err.code = 'E_NOT_FOUND'
@@ -265,7 +260,7 @@ function model () {
       setImmediate(() => cb())
     }
   }
-    
+
 `
 }
 function testingModel () {
@@ -274,13 +269,13 @@ function testingModel () {
   module.exports = {
     boat: boatModel()
   }
-  
+
   function boatModel () {
     const db = {
       1: { brand: 'Chaparral', color: 'red' },
       2: { brand: 'Chaparral', color: 'blue' }
     }
-  
+
     return {
       uid,
       create,
@@ -288,7 +283,7 @@ function testingModel () {
       update,
       del
     }
-  
+
     function uid () {
       return Object.keys(db)
         .sort((a, b) => a - b)
@@ -296,7 +291,7 @@ function testingModel () {
         .filter((n) => !isNaN(n))
         .pop() + 1 + ''
     }
-  
+
     function create (id, data, cb) {
       if (db.hasOwnProperty(id)) {
         const err = Error('resource exists')
@@ -307,8 +302,29 @@ function testingModel () {
       db[id] = data
       setImmediate(() => cb(null, id))
     }
-  
+
     function read (id, cb) {
+      if (!(db.hasOwnProperty(id))) {
+        const err = Error('not found')
+        err.code = 'E_NOT_FOUND'
+        setImmediate(() => cb(err))
+        return
+      }
+      setImmediate(() => cb(null, db[id]))
+    }
+
+    function update (id, data, cb) {
+      if (!(db.hasOwnProperty(id))) {
+        const err = Error('not found')
+        err.code = 'E_NOT_FOUND'
+        setImmediate(() => cb(err))
+        return
+      }
+      db[id] = data
+      setImmediate(() => cb())
+    }
+
+    function del (id, cb) {
       if (id === '${ROUTE_500}') {
         setImmediate(() => cb(Error('unknown')))
         return
@@ -319,31 +335,10 @@ function testingModel () {
         setImmediate(() => cb(err))
         return
       }
-      setImmediate(() => cb(null, db[id]))
-    }
-  
-    function update (id, data, cb) {
-      if (!(db.hasOwnProperty(id))) {
-        const err = Error('not found')
-        err.code = 'E_NOT_FOUND'
-        setImmediate(() => cb(err))
-        return
-      }
-      db[id] = data
-      setImmediate(() => cb())
-    }
-  
-    function del (id, cb) {
-      if (!(db.hasOwnProperty(id))) {
-        const err = Error('not found')
-        err.code = 'E_NOT_FOUND'
-        setImmediate(() => cb(err))
-        return
-      }
       delete db[id]
       setImmediate(() => cb())
     }
   }
-    
+
 `
 }

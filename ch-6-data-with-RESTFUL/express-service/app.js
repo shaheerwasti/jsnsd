@@ -7,7 +7,7 @@ var logger = require('morgan');
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
 var boatRouter = require('./routes/boat');
-var bicycleRouter = require('./routes/bicycle');
+//var bicycleRouter = require('./routes/bicycle');
 var app = express();
 
 // view engine setup
@@ -23,7 +23,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/', indexRouter);
 app.use('/users', usersRouter);
 app.use('/boat', boatRouter);
-app.use('/bicycle', bicycleRouter);
+//app.use('/bicycle', bicycleRouter);
 
 
 // catch 404 and forward to error handler
@@ -35,6 +35,7 @@ app.use(function(req, res, next) {
 app.use(function(err, req, res, next) {
   console.log(err);
   err.code='E_NOT_FOUND'?res.status(404):res.status(err.status || 500);
+  //err.code='E_NOT_FOUND'?res.status(404):res.status(err.status || 500);
   res.send({
     type:'error',
     status:err.status,

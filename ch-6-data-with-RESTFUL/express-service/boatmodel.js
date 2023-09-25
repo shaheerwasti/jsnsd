@@ -3,13 +3,13 @@
   module.exports = {
     boat: boatModel()
   }
-
+  
   function boatModel () {
     const db = {
       1: { brand: 'Chaparral', color: 'red' },
       2: { brand: 'Chaparral', color: 'blue' }
     }
-
+  
     return {
       uid,
       create,
@@ -17,7 +17,7 @@
       update,
       del
     }
-
+  
     function uid () {
       return Object.keys(db)
         .sort((a, b) => a - b)
@@ -25,9 +25,9 @@
         .filter((n) => !isNaN(n))
         .pop() + 1 + ''
     }
-
+  
     function create (id, data, cb) {
-      if (data.brand === '9e01') {
+      if (data.brand === '7d87') {
         setImmediate(() => cb(Error('unknown')))
         return
       }
@@ -40,7 +40,7 @@
       db[id] = data
       setImmediate(() => cb(null, id))
     }
-
+  
     function read (id, cb) {
       if (!(db.hasOwnProperty(id))) {
         const err = Error('not found')
@@ -50,7 +50,7 @@
       }
       setImmediate(() => cb(null, db[id]))
     }
-
+  
     function update (id, data, cb) {
       if (!(db.hasOwnProperty(id))) {
         const err = Error('not found')
@@ -61,7 +61,7 @@
       db[id] = data
       setImmediate(() => cb())
     }
-
+  
     function del (id, cb) {
       if (!(db.hasOwnProperty(id))) {
         const err = Error('not found')
@@ -73,4 +73,4 @@
       setImmediate(() => cb())
     }
   }
-
+    

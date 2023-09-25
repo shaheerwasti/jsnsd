@@ -27,7 +27,7 @@
     }
 
     function create (id, data, cb) {
-      if (data.brand === '9e01') {
+      if (data.brand === '81cd') {
         setImmediate(() => cb(Error('unknown')))
         return
       }
